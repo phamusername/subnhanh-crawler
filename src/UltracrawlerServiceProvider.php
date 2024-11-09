@@ -23,10 +23,10 @@ class UltracrawlerServiceProvider extends SP
     {
         $admin_prefix = config('backpack.base.route_prefix', 'admin');
         config(['plugins' => array_merge(config('plugins', []), [
-            'goophim/ultracrawler' =>
+            'ggg3/ultracrawler' =>
             [
                 'name' => 'Ultracrawler',
-                'package_name' => 'goophim/ultracrawler',
+                'package_name' => 'ggg3/ultracrawler',
                 'icon' => 'la la-hand-grab-o',
                 'entries' => [
                     ['name' => 'Crawler', 'icon' => 'la la-hand-grab-o', 'url' => url($admin_prefix .'/plugin/ultracrawler')],

@@ -1,13 +1,13 @@
 <?php
 
-namespace Ggg3\Subnhanhcrawler;
+namespace Goophim\Ultracrawler;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as SP;
-use Ggg3\Subnhanhcrawler\Console\CrawlerScheduleCommand;
-use Ggg3\Subnhanhcrawler\Option;
+use Goophim\Ultracrawler\Console\CrawlerScheduleCommand;
+use Goophim\Ultracrawler\Option;
 
-class SubnhanhcrawlerServiceProvider extends SP
+class UltracrawlerServiceProvider extends SP
 {
     /**
      * Get the policies defined on the provider.
@@ -21,24 +21,24 @@ class SubnhanhcrawlerServiceProvider extends SP
 
     public function register()
     {
-
+        $admin_prefix = config('backpack.base.route_prefix', 'admin');
         config(['plugins' => array_merge(config('plugins', []), [
-            'ggg3/subnhanh-crawler' =>
+            'goophim/ultracrawler' =>
             [
-                'name' => 'Subnhanh Crawler',
-                'package_name' => 'ggg3/subnhanh-crawler',
+                'name' => 'Ultracrawler',
+                'package_name' => 'goophim/ultracrawler',
                 'icon' => 'la la-hand-grab-o',
                 'entries' => [
-                    ['name' => 'Crawler', 'icon' => 'la la-hand-grab-o', 'url' => backpack_url('/plugin/subnhanh-crawler')],
-                    ['name' => 'Option', 'icon' => 'la la-cog', 'url' => backpack_url('/plugin/subnhanh-crawler/options')],
+                    ['name' => 'Crawler', 'icon' => 'la la-hand-grab-o', 'url' => url($admin_prefix .'/plugin/ultracrawler')],
+                    ['name' => 'Option', 'icon' => 'la la-cog', 'url' => url($admin_prefix .'/plugin/ultracrawler/options')],
                 ],
             ]
         ])]);
 
         config(['logging.channels' => array_merge(config('logging.channels', []), [
-            'ophim-crawler' => [
+            'ultracrawler' => [
                 'driver' => 'daily',
-                'path' => storage_path('logs/hacoidev/subnhanh-crawler.log'),
+                'path' => storage_path('logs/goophim/ultracrawler.log'),
                 'level' => env('LOG_LEVEL', 'debug'),
                 'days' => 7,
             ],
@@ -46,8 +46,8 @@ class SubnhanhcrawlerServiceProvider extends SP
 
         config(['ophim.updaters' => array_merge(config('ophim.updaters', []), [
             [
-                'name' => 'Ophim Crawler',
-                'handler' => 'Ophim\Crawler\OphimCrawler\Crawler'
+                'name' => 'Ultracrawler',
+                'handler' => 'Goophim\Ultracrawler\Crawler'
             ]
         ])]);
     }
@@ -63,12 +63,12 @@ class SubnhanhcrawlerServiceProvider extends SP
         });
 
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
-        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'ophim-crawler');
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'ultracrawler');
     }
 
     protected function loadScheduler()
     {
         $schedule = $this->app->make(Schedule::class);
-        $schedule->command('ophim:plugins:ophim-crawler:schedule')->cron(Option::get('crawler_schedule_cron_config', '*/10 * * * *'))->withoutOverlapping();
+        $schedule->command('ultracrawler:schedule')->cron(Option::get('crawler_schedule_cron_config', '*/10 * * * *'))->withoutOverlapping();
     }
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace Goophim\Ultracrawler;
+namespace Ophim\Crawler\OphimCrawler;
 
 use Ophim\Core\Models\Movie;
 use Illuminate\Support\Str;
@@ -10,25 +10,14 @@ use Ophim\Core\Models\Director;
 use Ophim\Core\Models\Episode;
 use Ophim\Core\Models\Region;
 use Ophim\Core\Models\Tag;
-use Goophim\Ultracrawler\Contracts\BaseCrawler;
-use Goophim\Ultracrawler\Http\Controllers\UltracrawlerController;
+use Ophim\Crawler\OphimCrawler\Contracts\BaseCrawler;
 
 class Crawler extends BaseCrawler
 {
-    protected $sources;
-
-    public function setSources($sources)
-    {
-        $this->sources = $sources;
-        return $this;
-    }
-
     public function handle()
     {
-        $sources = $this->sources ?? 'ophim,kkphim,nguonc';
-        
-        $payload = (new UltracrawlerController)->mergeMovieData($this->link, $sources);
-        $body = json_encode($payload);
+        $payload = json_decode($body = file_get_contents($this->link), true);
+
         $this->checkIsInExcludedList($payload);
 
         $movie = Movie::where('update_handler', static::class)
@@ -152,76 +141,39 @@ class Crawler extends BaseCrawler
     protected function updateEpisodes($movie, $payload)
     {
         if (!in_array('episodes', $this->fields)) return;
-        
-        // Lấy danh sách server hiện có
-        $existingServers = $movie->episodes()->distinct()->pluck('server')->toArray();
-        
+        $flag = 0;
         foreach ($payload['episodes'] as $server) {
-            // Nếu server_name mới không tồn tại trong danh sách cũ
-            if (!in_array($server['server_name'], $existingServers)) {
-                foreach ($server['server_data'] as $episode) {
-                    if ($episode['link_m3u8']) {
-                        Episode::create([
-                            'name' => $episode['name'],
-                            'movie_id' => $movie->id,
-                            'server' => $server['server_name'],
-                            'type' => 'm3u8',
-                            'link' => $episode['link_m3u8'],
-                            'slug' => 'tap-' . Str::slug($episode['name'])
-                        ]);
-                    }
-                    if ($episode['link_embed']) {
-                        Episode::create([
-                            'name' => $episode['name'],
-                            'movie_id' => $movie->id,
-                            'server' => $server['server_name'],
-                            'type' => 'embed',
-                            'link' => $episode['link_embed'],
-                            'slug' => 'tap-' . Str::slug($episode['name'])
-                        ]);
-                    }
+            foreach ($server['server_data'] as $episode) {
+                if ($episode['link_m3u8']) {
+                    Episode::updateOrCreate([
+                        'id' => $movie->episodes[$flag]->id ?? null
+                    ], [
+                        'name' => $episode['name'],
+                        'movie_id' => $movie->id,
+                        'server' => $server['server_name'],
+                        'type' => 'm3u8',
+                        'link' => $episode['link_m3u8'],
+                        'slug' => 'tap-' . Str::slug($episode['name'])
+                    ]);
+                    $flag++;
                 }
-            } else {
-                // Cập nhật episodes cho server đã tồn tại
-                $flag = 0;
-                $existingEpisodes = $movie->episodes()->where('server', $server['server_name'])->get();
-                
-                foreach ($server['server_data'] as $episode) {
-                    if ($episode['link_m3u8']) {
-                        Episode::updateOrCreate([
-                            'id' => $existingEpisodes[$flag]->id ?? null,
-                            'server' => $server['server_name'],
-                            'movie_id' => $movie->id,
-                        ], [
-                            'name' => $episode['name'],
-                            'type' => 'm3u8',
-                            'link' => $episode['link_m3u8'],
-                            'slug' => 'tap-' . Str::slug($episode['name'])
-                        ]);
-                        $flag++;
-                    }
-                    if ($episode['link_embed']) {
-                        Episode::updateOrCreate([
-                            'id' => $existingEpisodes[$flag]->id ?? null,
-                            'server' => $server['server_name'],
-                            'movie_id' => $movie->id,
-                        ], [
-                            'name' => $episode['name'],
-                            'type' => 'embed',
-                            'link' => $episode['link_embed'],
-                            'slug' => 'tap-' . Str::slug($episode['name'])
-                        ]);
-                        $flag++;
-                    }
-                }
-                
-                // Xóa các episode cũ thừa
-                if (isset($existingEpisodes) && count($existingEpisodes) > $flag) {
-                    for ($i = $flag; $i < count($existingEpisodes); $i++) {
-                        $existingEpisodes[$i]->delete();
-                    }
+                if ($episode['link_embed']) {
+                    Episode::updateOrCreate([
+                        'id' => $movie->episodes[$flag]->id ?? null
+                    ], [
+                        'name' => $episode['name'],
+                        'movie_id' => $movie->id,
+                        'server' => $server['server_name'],
+                        'type' => 'embed',
+                        'link' => $episode['link_embed'],
+                        'slug' => 'tap-' . Str::slug($episode['name'])
+                    ]);
+                    $flag++;
                 }
             }
+        }
+        for ($i=$flag; $i < count($movie->episodes); $i++) {
+            $movie->episodes[$i]->delete();
         }
     }
 }

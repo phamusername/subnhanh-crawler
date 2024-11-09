@@ -1,12 +1,12 @@
 <?php
 
-namespace Goophim\Ultracrawler\Console;
+namespace Ophim\Crawler\OphimCrawler\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
-use Goophim\Ultracrawler\Crawler;
-use Goophim\Ultracrawler\Option;
+use Ophim\Crawler\OphimCrawler\Crawler;
+use Ophim\Crawler\OphimCrawler\Option;
 
 class CrawlerScheduleCommand extends Command
 {
@@ -15,7 +15,7 @@ class CrawlerScheduleCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'ultracrawler:schedule';
+    protected $signature = 'ophim:plugins:ophim-crawler:schedule';
 
     /**
      * The console command description.
@@ -32,7 +32,7 @@ class CrawlerScheduleCommand extends Command
      */
     public function __construct()
     {
-        $this->logger = Log::channel('ultracrawler');
+        $this->logger = Log::channel('ophim-crawler');
         parent::__construct();
     }
 
@@ -44,15 +44,11 @@ class CrawlerScheduleCommand extends Command
     public function handle()
     {
         if(!$this->checkCrawlerScheduleEnable()) return 0;
-        
         $link = sprintf('%s/danh-sach/phim-moi-cap-nhat', Option::get('domain'));
         $data = collect();
         $page_from = Option::get('crawler_schedule_page_from', 1);
         $page_to = Option::get('crawler_schedule_page_to', 2);
-        $sources = Option::get('crawler_schedule_sources', 'ophim,kkphim,nguonc');
-        
         $this->logger->notice(sprintf("Crawler Page (FROM: %d | TO: %d)",  $page_from, $page_to));
-        
         for ($i = $page_from; $i <= $page_to; $i++) {
             if(!$this->checkCrawlerScheduleEnable()) {
                 $this->logger->notice(sprintf("Stop Crawler Page"));
@@ -65,37 +61,30 @@ class CrawlerScheduleCommand extends Command
                 $data->push(...$response['items']);
             }
         }
-        
         $movies = $data->shuffle();
         $count_movies = count($movies);
         $this->logger->notice(sprintf("Start Crawler Movies (TOTAL: %d)",  $count_movies));
         $count_error = 0;
-        
         foreach ($movies as $key => $movie) {
             try {
                 if(!$this->checkCrawlerScheduleEnable()) {
                     $this->logger->notice(sprintf("Stop Crawler Movies (TOTAL: %d | CRAWED: %d | ERROR %d)", $count_movies, $key, $count_error));
                     return 0;
                 }
-                
-                $crawler = new Crawler(
-                    $movie['slug'],
-                    Option::get('crawler_schedule_fields', []),
+                $link = sprintf('%s/phim/%s', Option::get('domain'), $movie['slug']);
+                $crawler = (new Crawler(
+                    $link,
+                    Option::get('crawler_schedule_fields', Option::getAllOptions()['crawler_schedule_fields']['default']),
                     Option::get('crawler_schedule_excludedCategories', []),
                     Option::get('crawler_schedule_excludedRegions', []),
                     Option::get('crawler_schedule_excludedType', []),
-                    Option::get('crawler_schedule_forceUpdate', false)
-                );
-                
-                $crawler->setSources($sources);
-                $crawler->handle();
-                
+                    false))
+                    ->handle();
             } catch (\Exception $e) {
                 $this->logger->error(sprintf("%s ERROR: %s", $movie['slug'], $e->getMessage()));
                 $count_error++;
             }
         }
-        
         $this->logger->notice(sprintf("Finish Crawler Movies (TOTAL: %d | DONE: %d | ERROR: %d)", $count_movies, $count_movies - $count_error, $count_error));
         return 0;
     }

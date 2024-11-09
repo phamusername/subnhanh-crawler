@@ -1,6 +1,6 @@
 <?php
 
-namespace Goophim\Ultracrawler;
+namespace Ophim\Crawler\OphimCrawler;
 
 use Illuminate\Support\Facades\Log;
 use Intervention\Image\ImageManagerStatic as Image;
@@ -86,16 +86,13 @@ class Collector
         try {
             $url = strtok($url, '?');
             $filename = substr($url, strrpos($url, '/') + 1);
-            if (Option::get('convert_to_webp', false)) {
-                $filename = pathinfo($filename, PATHINFO_FILENAME) . '.webp';
-            }
             $path = "images/{$slug}/{$filename}";
-            
-            $disk = strval(Option::get('storage_disk', 'public'));
 
-            if (Storage::disk($disk)->exists($path) && $this->forceUpdate == false) {
+            if (Storage::disk('public')->exists($path) && $this->forceUpdate == false) {
                 return Storage::url($path);
             }
+
+            // Khởi tạo curl để tải về hình ảnh
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_HEADER, false);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -111,14 +108,10 @@ class Collector
                     $constraint->aspectRatio();
                 });
             }
-            
-            $tempPath = tempnam(sys_get_temp_dir(), 'img_');
-            if (Option::get('convert_to_webp', false)) {
-                $img->encode('webp', Option::get('webp_quality', 80));
-            }
-            $img->save($tempPath);
-            Storage::disk($disk)->put($path, file_get_contents($tempPath));
-            unlink($tempPath);
+
+            Storage::disk('public')->put($path, null);
+
+            $img->save(storage_path("app/public/" . $path));
 
             return Storage::url($path);
         } catch (\Exception $e) {

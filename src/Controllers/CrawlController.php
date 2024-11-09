@@ -1,42 +1,39 @@
 <?php
 
-namespace Goophim\Ultracrawler\Http\Controllers;
+namespace Ophim\Crawler\OphimCrawler\Controllers;
 
 
 use Backpack\CRUD\app\Http\Controllers\CrudController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
-use Goophim\Ultracrawler\Crawler;
+use Ophim\Crawler\OphimCrawler\Crawler;
 use Ophim\Core\Models\Movie;
-use Goophim\Ultracrawler\Http\Controllers\UltracrawlerController;
 
+/**
+ * Class CrawlController
+ * @package Ophim\Crawler\OphimCrawler\Controllers
+ * @property-read \Backpack\CRUD\app\Library\CrudPanel\CrudPanel $crud
+ */
 class CrawlController extends CrudController
 {
     public function fetch(Request $request)
     {
         try {
             $data = collect();
-            $sources = $request->get('sources') ?: 'ophim,kkphim,nguonc';
 
             $request['link'] = preg_split('/[\n\r]+/', $request['link']);
 
             foreach ($request['link'] as $link) {
                 if (preg_match('/(.*?)(\/phim\/)(.*?)/', $link)) {
-                    $slug = explode('phim/', $link)[1];
-                    $slug = preg_replace('/[\/\?].*$/', '', $slug);
-                    $response = (new UltracrawlerController)->mergeMovieData($slug, $sources);
+                    $link = sprintf('%s/phim/%s', config('ophim_crawler.domain', 'https://ophim1.com'), explode('phim/', $link)[1]);
+                    $response = json_decode(file_get_contents($link), true);
                     $data->push(collect($response['movie'])->only('name', 'slug')->toArray());
-                }
-                elseif (preg_match('/(.*?)(\/film\/)(.*?)/', $link)) {
-                    $slug = explode('film/', $link)[1];
-                    $slug = preg_replace('/[\/\?].*$/', '', $slug);
-                    $response = (new UltracrawlerController)->mergeMovieData($slug, $sources);
-                    $data->push(collect($response['movie'])->only('name', 'slug')->toArray());
-                }
-                else {
+                } else {
                     for ($i = $request['from']; $i <= $request['to']; $i++) {
-                        $response = (new UltracrawlerController)->mergeUpdateData($i, $sources);
+                        $response = json_decode(Http::timeout(30)->get($link, [
+                            'page' => $i
+                        ]), true);
                         if ($response['status']) {
                             $data->push(...$response['items']);
                         }
@@ -75,26 +72,14 @@ class CrawlController extends CrudController
 
     public function crawl(Request $request)
     {
+        $pattern = sprintf('%s/phim/{slug}', config('ophim_crawler.domain', 'https://ophim1.com'));
         try {
-            $crawler = new Crawler(
-                $request['slug'], 
-                request('fields', []), 
-                request('excludedCategories', []), 
-                request('excludedRegions', []), 
-                request('excludedType', []), 
-                request('forceUpdate', false)
-            );
-            
-            // Lấy sources từ request hoặc sử dụng giá trị mặc định
-            $sources = request('sources', 'ophim,kkphim,nguonc');
-            $crawler->setSources($sources);
-            
-            $result = $crawler->handle();
-            
-            return response()->json(['message' => 'OK', 'wait' => $result ?? true]);
+            $link = str_replace('{slug}', $request['slug'], $pattern);
+            $crawler = (new Crawler($link, request('fields', []), request('excludedCategories', []), request('excludedRegions', []), request('excludedType', []), request('forceUpdate', false)))->handle();
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage(), 'wait' => false], 500);
         }
+        return response()->json(['message' => 'OK', 'wait' => $crawler ?? true]);
     }
 
     protected function movieUpdateOptions(): array
@@ -120,13 +105,6 @@ class CrawlController extends CrudController
                 'showtimes' => 'Giờ chiếu phim',
                 'publish_year' => 'Năm xuất bản',
                 'is_copyright' => 'Đánh dấu có bản quyền',
-                'tmdb_type' => 'Loại phim TMDB',
-                'tmdb_id' => 'ID TMDB',
-                'tmdb_season' => 'TMDB Season',
-                'tmdb_episode' => 'TMDB Episode',
-                'tmdb_vote_average' => 'TMDB Vote Average',
-                'tmdb_vote_count' => 'TMDB Vote Count',
-                'imdb_id' => 'IMDB ID'
             ],
             'Phân loại' => [
                 'type' => 'Định dạng phim',

@@ -21,7 +21,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Ggg3\\Subnhanhrawler\\SubnhanhrawlerServiceProvider"
+                "Ggg3\\Subnhanhrawler\\SubnhanhcrawlerServiceProvider"
             ]
         }
     },

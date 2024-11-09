@@ -1,13 +1,13 @@
 <?php
 
-namespace Ophim\Crawler\OphimCrawler;
+namespace Ggg3\SubnhanhCrawler;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as SP;
-use Ophim\Crawler\OphimCrawler\Console\CrawlerScheduleCommand;
-use Ophim\Crawler\OphimCrawler\Option;
+use Ggg3\SubnhanhCrawler\Console\CrawlerScheduleCommand;
+use Ggg3\SubnhanhCrawler\Option;
 
-class OphimCrawlerServiceProvider extends SP
+class SubnhanhcrawlerServiceProvider extends SP
 {
     /**
      * Get the policies defined on the provider.

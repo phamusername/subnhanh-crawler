@@ -21,7 +21,7 @@ class SubnhanhcrawlerServiceProvider extends SP
 
     public function register()
     {
-        $admin_preflix = config('backpack.base.route_prefix', 'admin')
+        $admin_preflix = config('backpack.base.route_prefix', 'admin');
 
         config(['plugins' => array_merge(config('plugins', []), [
             'ggg3/subnhanh-crawler' =>

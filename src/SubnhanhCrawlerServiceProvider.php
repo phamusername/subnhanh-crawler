@@ -21,6 +21,7 @@ class SubnhanhcrawlerServiceProvider extends SP
 
     public function register()
     {
+        $admin_preflix = config('backpack.base.route_prefix', 'admin')
 
         config(['plugins' => array_merge(config('plugins', []), [
             'ggg3/subnhanh-crawler' =>
@@ -29,8 +30,8 @@ class SubnhanhcrawlerServiceProvider extends SP
                 'package_name' => 'hacoidev/subnhanh-crawler',
                 'icon' => 'la la-hand-grab-o',
                 'entries' => [
-                    ['name' => 'Crawler', 'icon' => 'la la-hand-grab-o', 'url' => backpack_url('/plugin/subnhanh-crawler')],
-                    ['name' => 'Option', 'icon' => 'la la-cog', 'url' => backpack_url('/plugin/subnhanh-crawler/options')],
+                    ['name' => 'Crawler', 'icon' => 'la la-hand-grab-o', 'url' => url($admin_preflix .'/plugin/subnhanh-crawler')],
+                    ['name' => 'Option', 'icon' => 'la la-cog', 'url' => url($admin_preflix .'/plugin/subnhanh-crawler/options')],
                 ],
             ]
         ])]);

@@ -5,7 +5,7 @@ namespace Ggg3\SubnhanhCrawler;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as SP;
 use Ggg3\SubnhanhCrawler\Console\CrawlerScheduleCommand;
-use Ggg3\Subnhanhcrawler\Option;
+use Ggg3\SubnhanhCrawler\Option;
 
 class SubnhanhcrawlerServiceProvider extends SP
 {

@@ -1,0 +1,29 @@
+{
+    "name": "ggg3/subnhanh-crawler",
+    "description": "ophim crawler",
+    "type": "package",
+    "require": {
+        "hacoidev/ophim-core": "^1.0.0",
+        "intervention/image": "^2.7"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Ggg3\\Subnhanhrawler\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "mp",
+            "email": "t.me/gggforyou"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Ggg3\\Subnhanhrawler\\SubnhanhrawlerServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable"
+}

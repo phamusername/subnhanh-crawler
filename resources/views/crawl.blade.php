@@ -3,7 +3,7 @@
 @php
     $defaultBreadcrumbs = [
         trans('backpack::crud.admin') => backpack_url('dashboard'),
-        'Crawler' => backpack_url('plugin/subnhanh-crawler'),
+        'Crawler' => backpack_url('plugin/ultracrawler'),
     ];
 
     $breadcrumbs = $breadcrumbs ?? $defaultBreadcrumbs;
@@ -34,6 +34,21 @@
                                     <option value="status-ongoing">Đang chiếu</option>
                                 </select>
                                 <button class="btn btn-sm btn-primary" id="movies-get-handle">Lấy danh sách</button>
+                            </div>
+                            <div class="form-group mt-2">
+                                <label>Nguồn crawl</label>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input source-checkbox" name="sources[]" value="ophim" checked>
+                                    <label class="form-check-label">Ophim</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input source-checkbox" name="sources[]" value="kkphim" checked>
+                                    <label class="form-check-label">KKPhim</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input source-checkbox" name="sources[]" value="nguonc" checked>
+                                    <label class="form-check-label">NguonC</label>
+                                </div>
                             </div>
                             <textarea class="form-control" rows="5" name="link">https://ophim1.com/danh-sach/phim-moi-cap-nhat</textarea>
                             <small><i>Mỗi link cách nhau 1 dòng</i></small>
@@ -284,6 +299,20 @@
                         }).get();
                         localStorage.setItem('crawler-fields-uncheck', fields);
                     });
+
+                // Load saved sources from localStorage
+                let savedSources = localStorage.getItem('crawler-sources')?.split(",") ?? ['ophim', 'kkphim', 'nguonc'];
+                $('.source-checkbox').each(function() {
+                    $(this).prop('checked', savedSources.includes($(this).val()));
+                });
+
+                // Save sources to localStorage when changed
+                $('.source-checkbox').change(function() {
+                    let selectedSources = $('.source-checkbox:checked').map(function() {
+                        return $(this).val();
+                    }).get();
+                    localStorage.setItem('crawler-sources', selectedSources);
+                });
             });
         </script>
     @endpush
@@ -304,11 +333,16 @@
 
             const fetchApi = async (link, from, to) => {
                 isFetching = true;
-                const response = await fetch("{{ backpack_url('plugin/subnhanh-crawler/fetch') }}?" +
+                const sources = $('.source-checkbox:checked').map(function() {
+                    return $(this).val();
+                }).get().join(',');
+                
+                const response = await fetch("{{ backpack_url('plugin/ultracrawler/fetch') }}?" +
                     new URLSearchParams({
                         link,
                         from,
-                        to
+                        to,
+                        sources
                     }));
 
                 if (response.status >= 200 && response.status < 300) {
@@ -335,8 +369,7 @@
             }
             var listMovies = [];
 
-            // 1 Link: Crawl từng page
-            const crawlPages = (current) => {
+            const crawlPages = async (current) => {
                 if (current > to) {
                     listMovies.sort(() => Math.random() - 0.5);
                     let movieList = $('#movie-list').html();
@@ -346,26 +379,34 @@
                     isFetching = false;
                     return
                 }
-                $('.btn-load').html(`Đang tải...: Page ${current}/${to}`);
-                fetchApi(link, current, current).then(res => {
-                    if (res.payload.length > 0) {
-                        listMovies = listMovies.concat(res.payload);
-                        let curTotal = parseInt($('.total-movie-count').html());
-                        let selectedCount = parseInt($('.selected-movie-count').html());
-                        $('.total-movie-count').html(curTotal + res.payload.length)
-                        $('.selected-movie-count').html(selectedCount + res.payload.length)
-                    }
-                }).catch(err => {
+
+                $('.btn-load').html(`Đang tải...: Page ${current} đến ${Math.min(current + 9, to)}/${to}`);
+
+                const promises = [];
+                for (let i = current; i < Math.min(current + 10, to + 1); i++) {
+                    promises.push(fetchApi(link, i, i));
+                }
+
+                try {
+                    const results = await Promise.all(promises);
+                    results.forEach(res => {
+                        if (res.payload.length > 0) {
+                            listMovies = listMovies.concat(res.payload);
+                            let curTotal = parseInt($('.total-movie-count').html());
+                            let selectedCount = parseInt($('.selected-movie-count').html());
+                            $('.total-movie-count').html(curTotal + res.payload.length)
+                            $('.selected-movie-count').html(selectedCount + res.payload.length)
+                        }
+                    });
+                } catch (err) {
                     $('input[name="link"]').addClass('is-invalid');
-                }).finally(() => {
-                    crawlPages(current + 1)
-                })
+                }
+
+                crawlPages(current + 10);
             }
 
-            // Nhiều link: crawl từng link
-            const crawlMultiLink = (arrLink, current) => {
-                let currentLink = arrLink[current];
-                if (!currentLink) {
+            const crawlMultiLink = async (arrLink, current) => {
+                if (current >= arrLink.length) {
                     listMovies.sort(() => Math.random() - 0.5);
                     let movieList = $('#movie-list').html();
                     $('#movie-list').html(movieList + template(listMovies))
@@ -374,20 +415,30 @@
                     isFetching = false;
                     return
                 }
-                $('.btn-load').html(`Đang tải...: Link ${current + 1}/${arrLink.length}`);
-                fetchApi(currentLink, 1, 1).then(res => {
-                    if (res.payload.length > 0) {
-                        listMovies = listMovies.concat(res.payload);
-                        let curTotal = parseInt($('.total-movie-count').html());
-                        let selectedCount = parseInt($('.selected-movie-count').html());
-                        $('.total-movie-count').html(curTotal + res.payload.length)
-                        $('.selected-movie-count').html(selectedCount + res.payload.length)
-                    }
-                }).catch(err => {
+
+                $('.btn-load').html(`Đang tải...: Link ${current + 1} đến ${Math.min(current + 29, arrLink.length)}/${arrLink.length}`);
+
+                const promises = [];
+                for (let i = current; i < Math.min(current + 30, arrLink.length); i++) {
+                    promises.push(fetchApi(arrLink[i], 1, 1));
+                }
+
+                try {
+                    const results = await Promise.all(promises);
+                    results.forEach(res => {
+                        if (res.payload.length > 0) {
+                            listMovies = listMovies.concat(res.payload);
+                            let curTotal = parseInt($('.total-movie-count').html());
+                            let selectedCount = parseInt($('.selected-movie-count').html());
+                            $('.total-movie-count').html(curTotal + res.payload.length)
+                            $('.selected-movie-count').html(selectedCount + res.payload.length)
+                        }
+                    });
+                } catch (err) {
                     $('input[name="link"]').addClass('is-invalid');
-                }).finally(() => {
-                    crawlMultiLink(arrLink, current + 1)
-                })
+                }
+
+                crawlMultiLink(arrLink, current + 30);
             }
 
             $('.total-movie-count').html(0);
@@ -459,46 +510,64 @@
 
 
         var wait = false;
-        const crawl = (el) => {
-            const slug = $(el).data('slug');
-            if (!slug) return;
+        const crawl = async (startEl) => {
+            const batchSize = 30;
+            let currentEl = startEl;
+            let batch = [];
 
-            var wait_timeout = 100;
-            if (wait) {
-                let timeout_from = $("input[name=timeout_from]").val();
-                let timeout_to = $("input[name=timeout_to]").val();
-                let maximum = Math.max(timeout_from, timeout_to);
-                let minimum = Math.min(timeout_from, timeout_to);
-                wait_timeout = Math.floor(Math.random() * (maximum - minimum + 1)) + minimum;
+            for (let i = 0; i < batchSize && currentEl.length; i++) {
+                const slug = $(currentEl).data('slug');
+                if (slug) {
+                    batch.push({ el: currentEl, slug: slug });
+                }
+                currentEl = $(currentEl).next('.crawling-movie');
             }
-            $(`.crawling-movie[data-slug="${slug}"] .status`).html(`Chờ ${wait_timeout}ms`);
-            setTimeout(() => {
-                processMovie(slug).then(res => {
-                    $(`.crawling-movie[data-slug="${slug}"]`).removeClass('text-info');
-                    $(`.crawling-movie[data-slug="${slug}"]`).addClass('text-success');
-                    $(`.crawling-movie[data-slug="${slug}"] .status`).html('OK');
-                    $(`.crawling-movie[data-slug="${slug}"]`).addClass('crawl-success');
-                    wait = res.payload.wait;
-                }).catch(err => {
-                    $(`.crawling-movie[data-slug="${slug}"]`).removeClass('text-info');
-                    $(`.crawling-movie[data-slug="${slug}"]`).addClass('text-danger');
-                    $(`.crawling-movie[data-slug="${slug}"] .status`).html('Error');
-                    $(`.crawling-movie[data-slug="${slug}"]`).addClass('crawl-failed');
-                    $(`#logs`).append(
-                        `<li class="text-danger">${slug} : ${err?.payload?.message ?? 'Unknown error'}</li>`
-                    );
-                    wait = false;
-                }).finally(() => {
-                    $(`.crawling-movie[data-slug="${slug}"]`).addClass('crawl-completed');
-                    $('.crawled-count').html($('.crawl-completed').length)
-                    $('.crawl-success-count').html($('.crawl-success').length)
-                    $('.crawl-failed-count').html($('.crawl-failed').length)
-                    crawl($(el).next('.crawling-movie'))
-                })
-            }, wait_timeout);
 
+            if (batch.length === 0) return;
 
-        }
+            const processBatch = async () => {
+                const promises = batch.map(async (item) => {
+                    const { el, slug } = item;
+                    var wait_timeout = 100;
+                    if (wait) {
+                        let timeout_from = $("input[name=timeout_from]").val();
+                        let timeout_to = $("input[name=timeout_to]").val();
+                        let maximum = Math.max(timeout_from, timeout_to);
+                        let minimum = Math.min(timeout_from, timeout_to);
+                        wait_timeout = Math.floor(Math.random() * (maximum - minimum + 1)) + minimum;
+                    }
+                    $(`.crawling-movie[data-slug="${slug}"] .status`).html(`Chờ ${wait_timeout}ms`);
+
+                    await new Promise(resolve => setTimeout(resolve, wait_timeout));
+
+                    try {
+                        const res = await processMovie(slug);
+                        $(`.crawling-movie[data-slug="${slug}"]`).removeClass('text-info').addClass('text-success');
+                        $(`.crawling-movie[data-slug="${slug}"] .status`).html('OK');
+                        $(`.crawling-movie[data-slug="${slug}"]`).addClass('crawl-success');
+                        wait = res.payload.wait;
+                    } catch (err) {
+                        $(`.crawling-movie[data-slug="${slug}"]`).removeClass('text-info').addClass('text-danger');
+                        $(`.crawling-movie[data-slug="${slug}"] .status`).html('Error');
+                        $(`.crawling-movie[data-slug="${slug}"]`).addClass('crawl-failed');
+                        $(`#logs`).append(`<li class="text-danger">${slug} : ${err?.payload?.message ?? 'Unknown error'}</li>`);
+                        wait = false;
+                    } finally {
+                        $(`.crawling-movie[data-slug="${slug}"]`).addClass('crawl-completed');
+                        $('.crawled-count').html($('.crawl-completed').length);
+                        $('.crawl-success-count').html($('.crawl-success').length);
+                        $('.crawl-failed-count').html($('.crawl-failed').length);
+                    }
+                });
+
+                await Promise.all(promises);
+            };
+
+            await processBatch();
+
+            // Gọi đệ quy để xử lý batch tiếp theo
+            crawl(currentEl);
+        };
 
         const processMovie = async (slug) => {
             $(`.crawling-movie[data-slug="${slug}"]`).removeClass('text-muted');
@@ -514,7 +583,13 @@
             const excludedRegions = $("[name='excludedRegions[]']").val()
             const excludedType = $("[name='excludedType[]']").val()
             const forceUpdate = ($("[name='force_update']").prop('checked') == true) ? true : false;
-            const response = await fetch("{{ backpack_url('plugin/subnhanh-crawler/crawl') }}", {
+            
+            // Lấy sources từ các checkbox đã chọn
+            const sources = $('.source-checkbox:checked').map(function() {
+                return $(this).val();
+            }).get().join(',');
+
+            const response = await fetch("{{ backpack_url('plugin/ultracrawler/crawl') }}", {
                 method: 'POST',
                 headers: {
                     "Content-Type": "application/json",
@@ -526,7 +601,8 @@
                     excludedCategories,
                     excludedRegions,
                     excludedType,
-                    forceUpdate
+                    forceUpdate,
+                    sources  // Thêm sources vào request body
                 })
             });
 
@@ -547,7 +623,7 @@
             const apiDomain = "{{ config('ophim_crawler.domain', 'https://ophim1.com') }}";
             let params = $("select[name=movies-get-params]").find(":selected").val();
 
-            const response = await fetch("{{ backpack_url('plugin/subnhanh-crawler/get-movies') }}", {
+            const response = await fetch("{{ backpack_url('plugin/ultracrawler/get-movies') }}", {
                 method: 'POST',
                 headers: {
                     "Content-Type": "application/json",

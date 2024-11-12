@@ -1,6 +1,6 @@
 <?php
 
-namespace Ggg3\SubnhanhCrawler;
+namespace Goophim\Ultracrawler;
 
 use Backpack\Settings\app\Models\Setting;
 use Illuminate\Support\Facades\Cache;
@@ -28,7 +28,7 @@ class Option
     //     $options[$name] = $value;
 
     //     return Setting::updateOrCreate([
-    //         'key' => 'hacoidev/ophim-crawler.options',
+    //         'key' => 'goophim/ultracrawler.options',
     //     ], [
     //         'name' => 'Options',
     //         'field' => json_encode(['name' => 'value', 'type', 'hidden']),
@@ -41,7 +41,7 @@ class Option
     public static function getEntry()
     {
         return Setting::firstOrCreate([
-            'key' => 'hacoidev/ophim-crawler.options',
+            'key' => 'goophim/ultracrawler.options',
         ], [
             'name' => 'Options',
             'field' => json_encode(['name' => 'value', 'type', 'hidden']),
@@ -55,13 +55,13 @@ class Option
         $categories = [];
         $regions = [];
         try {
-            $categories = Cache::remember('ophim_categories', 86400, function () {
-                $data = json_decode(file_get_contents(sprintf('%s/the-loai', config('ophim_crawler.domain', 'https://ophim1.com'))), true) ?? [];
+            $categories = Cache::remember('ultracrawler_categories', 86400, function () {
+                $data = json_decode(file_get_contents(sprintf('%s/the-loai', config('ultracrawler.domain', 'https://ophim1.com'))), true) ?? [];
                 return collect($data)->pluck('name', 'name')->toArray();
             });
 
-            $regions = Cache::remember('ophim_regions', 86400, function () {
-                $data = json_decode(file_get_contents(sprintf('%s/quoc-gia', config('ophim_crawler.domain', 'https://ophim1.com'))), true) ?? [];
+            $regions = Cache::remember('ultracrawler_regions', 86400, function () {
+                $data = json_decode(file_get_contents(sprintf('%s/quoc-gia', config('ultracrawler.domain', 'https://ophim1.com'))), true) ?? [];
                 return collect($data)->pluck('name', 'name')->toArray();
             });
         } catch (\Throwable $th) {
@@ -263,6 +263,114 @@ class Option
                 'allows_null'     => false,
                 'allows_multiple' => true,
                 'tab' => 'Schedule'
+            ],
+            'crawler_schedule_sources' => [
+                'name' => 'crawler_schedule_sources',
+                'label' => 'Nguồn crawl',
+                'type' => 'select_from_array', 
+                'options' => [
+                    'ophim' => 'OPhim',
+                    'kkphim' => 'KKPhim',
+                    'nguonc' => 'NguonC'
+                ],
+                'default' => 'ophim,kkphim,nguonc',
+                'allows_null' => false,
+                'allows_multiple' => true,
+                'tab' => 'Schedule'
+            ],
+            [
+                'name' => 'storage_section',
+                'label' => 'Cấu hình lưu trữ',
+                'type' => 'custom_html',
+                'value' => '<h5 class="mb-3">Cấu hình lưu trữ</h5>',
+                'tab' => 'Image Optimize',
+                'wrapper' => [
+                    'class' => 'form-group col-md-12 border-bottom mb-3'
+                ],
+            ],
+            'storage_disk' => [
+                'name' => 'storage_disk',
+                'label' => 'Disk lưu trữ',
+                'type' => 'select_from_array',
+                'options' => [
+                    'public' => 'Local Public',
+                    's3' => 'S3'
+                ],
+                'value' => 'public',
+                'tab' => 'Image Optimize',
+                'wrapper' => [
+                    'class' => 'form-group col-md-12'
+                ],
+                'hint' => '
+                <div class="mt-2">
+                    <div id="s3-hint">
+                        <p class="text-info">Để sử dụng S3, vui lòng cấu hình các biến môi trường sau trong file .env:</p>
+                        <pre class="text-muted">
+AWS_ENDPOINT=https://endpoint
+AWS_ACCESS_KEY_ID=accesskey
+AWS_SECRET_ACCESS_KEY=secretkey
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=bucket_name
+AWS_USE_PATH_STYLE_ENDPOINT=true
+AWS_URL=https://cdn.domain.com</pre>
+                    </div>
+                </div>
+                <script>
+                    function updateStorageHint() {
+                        var storageSelect = document.querySelector("select[name=\'storage_disk\']");
+                        var publicHint = document.getElementById("public-hint");
+                        var s3Hint = document.getElementById("s3-hint");
+                        
+                        if (storageSelect && publicHint && s3Hint) {
+                            publicHint.style.fontWeight = storageSelect.value === "public" ? "bold" : "normal";
+                            s3Hint.style.fontWeight = storageSelect.value === "s3" ? "bold" : "normal";
+                        }
+                    }
+
+                    document.addEventListener("DOMContentLoaded", function() {
+                        var storageSelect = document.querySelector("select[name=\'storage_disk\']");
+                        if (storageSelect) {
+                            updateStorageHint();
+                            storageSelect.addEventListener("change", updateStorageHint);
+                        }
+                    });
+                </script>'
+            ],
+            [
+                'name' => 'webp_section',
+                'label' => 'Cấu hình WebP',
+                'type' => 'custom_html',
+                'value' => '<h5 class="mb-3">Cấu hình WebP</h5>',
+                'tab' => 'Image Optimize',
+                'wrapper' => [
+                    'class' => 'form-group col-md-12 border-bottom mb-3'
+                ],
+            ],
+            'convert_to_webp' => [
+                'name' => 'convert_to_webp',
+                'label' => 'Chuyển đổi ảnh sang WebP',
+                'type' => 'checkbox',
+                'tab' => 'Image Optimize',
+                'wrapper' => [
+                    'class' => 'form-group col-md-12'
+                ],
+            ],
+            'webp_quality' => [
+                'name' => 'webp_quality',
+                'label' => 'Chất lượng WebP (%)',
+                'type' => 'number',
+                'default' => 80,
+                'attributes' => [
+                    'min' => 1,
+                    'max' => 100,
+                    'step' => 1,
+                    'placeholder' => '80',
+                    'class' => 'form-control'
+                ],
+                'wrapper' => [
+                    'class' => 'form-group col-md-12'
+                ],
+                'tab' => 'Image Optimize'
             ],
         ];
     }
